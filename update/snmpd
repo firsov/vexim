@@ -1,0 +1,24 @@
+#!/bin/bash
+apt-get install snmpd
+echo '
+syslocation Russia
+syscontact VS <support@virtualserver.ru> 
+rocommunity  oparin
+proc   0 0
+com2sec readonly   0.0.0.0/0       mycom'gpw 1 12'
+group MyROSystem v1        paranoid
+group MyROSystem v2c       paranoid
+group MyROSystem usm       paranoid
+group MyROGroup v1         readonly
+group MyROGroup v2c        readonly
+group MyROGroup usm        readonly
+group MyRWGroup v1         readwrite
+group MyRWGroup v2c        readwrite
+group MyRWGroup usm        readwrite
+view all    included  .1                               80
+view system included  .iso.org.dod.internet.mgmt.mib-2.system
+access MyROSystem ""     any       noauth    exact  system none   none
+access MyROGroup ""      any       noauth    exact  all    none   none
+access MyRWGroup ""      any       noauth    exact  all    all    none
+' > /etc/snmp/snmpd.conf
+/etc/init.d/snmpd restart

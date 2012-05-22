@@ -1,0 +1,20 @@
+#!/bin/bash
+
+
+#format proc[:init]
+#if not init, use proc name
+#ps aux | grep proc if not found, run /etc/init.d/init
+
+SERVICE="dovecot apache2 mysql exim4 vsftpd sshd:ssh nginx clamd:clamav-daemon spamd:spamassassin nginx-catap"
+
+for line in $SERVICE;do 
+    svc=${line%:*} || line
+    sh=${line#*:} || line
+
+    if [ -f /etc/init.d/$sh ] && [ $(pgrep $svc -c) -eq 0 ];then 
+	/etc/init.d/$sh restart;
+    fi
+done
+
+#EOC
+

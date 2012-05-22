@@ -1,0 +1,78 @@
+#!/bin/bash
+. /root/user/tools/.config
+
+if [ ! $CONFIG ];then
+    echo "config not loaded"
+    exit
+fi
+if [ ! -d ${MAILROOT} ];then
+    exit
+fi
+
+if [ ! -d /backup ];then
+mkdir /backup
+chmod 700 /backup
+fi;
+
+if [ $COMPRESS == true ];then
+    ext='tar.bz2'
+    tarParam='jcf'
+else
+    ext='tar'
+    tarParam='cf'
+fi
+
+allTime=$(date +%s)
+
+day=`date '+%w'`
+ls -d ${MAILROOT}/* | while read path;do
+
+
+
+site=`echo $path | cut -f5 -d/`
+    if [ $BACKUPUSER == true ] ;then
+	if [ ! -d /www/static/$site/ ];then 
+	    printf "Пропуск vhost - \e[1;33m%s\e[0m. Отсутствует привязка к пользователю\n"  "$site"
+	    continue;
+	fi
+	if [ ! -f /www/static/$site/../../backup/.enable.mail ];then 
+	    printf "Пропуск vhost - \e[1;33m%s\e[0m. Необходимо активировать\n"  "$site"
+	    continue;
+	fi
+	to=/www/static/$site/../../backup/
+    else
+	to=/backup/
+    fi
+
+    if [ -d /www/static/$site/../../backup ] && [ -f /www/static/$site/../../backup/.disable.mail ];then
+	printf "Пропуск vhost - \e[1;33m%s\e[0m. Заблокирован пользователем\n"  "$site"
+	continue;
+    fi
+
+    if [ ! -f ${to}maildir_${site}_0.${ext} ];then
+	day=0
+    fi
+
+    file="${to}maildir_${site}_${day}"
+
+    if [ -f ${file}.${ext} ];then
+        nice -n 20 mv ${file}.${ext} ${file}_old.${ext}
+    fi
+    time=$(date +%s)
+    if [ $day == 0 ];then
+	printf "\e[1;32mDump MailDir\e[0m: \e[1;34m%s\e[0m (full)" $site
+	nice -n 20 tar --exclude '.Junk'  -C ${MAILROOT}/$site  -${tarParam} ${file}.${ext} ./ 
+    else
+	printf "\e[1;32mDump MailDir\e[0m: \e[1;34m%s\e[0m (день $day)" $site
+	nice -n 20 tar --exclude '.Junk'  -C ${MAILROOT}/$site  -${tarParam} ${file}.${ext} --newer-mtime '1 days ago' ./ 
+    fi
+    if [ $BACKUPUSER == true ];then
+	ln -sf ${to} /backup/
+    fi
+    
+    getSize "${file}.${ext}" size
+    
+    printf ". Время работы - %d сек. Размер файла - %s\n" $(( $(date +%s) - ${time})) ${size}
+done
+printf "\e[1;32mЗавершение. Общее время работы: %d сек.\e[0m\n" $(( $(date +%s) - ${allTime}))
+#EOS

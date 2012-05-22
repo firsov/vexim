@@ -1,0 +1,9 @@
+#!/bin/bash
+if [ "`grep '$SiteConfig =~ s/^awsta' /usr/lib/cgi-bin/awstats.pl`" == "" ];then 
+    sed 's|\(\$SiteConfig\|\|.\+\)|\1\n$SiteConfig =~ s/^awstats\.//g;\n|' /usr/lib/cgi-bin/awstats.pl -i;
+fi
+ls  /www/*/*/www -d  | while read path;do 
+    login=$(echo $path|  cut -f3 -d/)
+    site=$(echo $path|  cut -f4 -d/)
+    su $login -s /bin/bash -c "/usr/lib/cgi-bin/awstats.pl -update -config=$site -configdir=/etc/awstats"
+done

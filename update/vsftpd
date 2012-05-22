@@ -1,0 +1,13 @@
+#!/bin/bash
+updatehost="http://n1ck.name/conf/"
+hostname=`hostname`
+cd /etc/
+if [ "`grep false /etc/shells`" == "" ];then
+    echo /bin/false >> /etc/shells
+fi
+if [ ! -f /etc/ssl/certs/vsftpd.pem ];then
+    openssl req -x509 -nodes -days 3650 -newkey rsa:4096  -keyout /etc/ssl/certs/vsftpd.pem  -out /etc/ssl/certs/vsftpd.pem -subj '/C=Ru/ST=Moscow/L=Moscow/CN='$hostname;
+fi
+wget ${updatehost}vsftpd.conf -O  /etc/vsftpd.conf
+/etc/init.d/vsftpd restart
+

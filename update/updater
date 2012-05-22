@@ -1,0 +1,36 @@
+#!/bin/bash
+
+########################################################################################################################
+#
+#    Скрипт автоматического скачивания и запуска патчей
+#    Использование: wget -O /tmp/updater n1ck.name/conf/vexim/update/updater && sh /tmp/updater
+#
+########################################################################################################################
+
+if [ ! -f /etc/ip ];then
+    printf "\e[1;31mInstaller Not Detected\e[0m\n"
+    exit
+fi
+
+if [ ! -f /etc/.installer_version ];then
+    printf "\e[1;31mUnknow version detected. Contact to support\e[0m\n"
+fi
+
+updatehost="http://n1ck.name/conf/vexim/update/"
+printf "\e[1;32m%s\e[0m\n" "Run AUTO Updater!!!!"
+wget -q $updatehost  -O - | grep update_from | awk -F '"' '{print "'${updatehost}'"$8}' | sort | while read url;do
+    txt=`echo $url | sed 's|'$updatehost'||g;s|_| |g;s|.sh$||g'`
+    printf "\e[1;32m%s\e[0m\n" "Try update $txt"
+    echo $url;
+    wget -O /tmp/.temp.sh $url -q 
+    if [ ! -f /tmp/.temp.sh ];then
+	printf "\e[1;31mUncatch error. Contact to support\e[0m\n"
+    fi
+    chmod +x /tmp/.temp.sh
+    /tmp/.temp.sh
+    rm -f /tmp/.temp.sh
+done
+#end
+printf "\e[1;32m%s\e[0m\n" "Finish Auto Updater!!!!"
+
+

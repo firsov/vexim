@@ -1,0 +1,108 @@
+#!/bin/bash
+
+. /root/user/tools/.config
+
+
+if [ ! $CONFIG ];then
+    echo "config not loaded"
+    exit
+fi
+
+if [ ! -d /backup ];then
+mkdir /backup
+chmod 700 /backup
+fi;
+
+day=`date '+%w'`
+echo "" > /root/user/tmp.db2user
+cat	/root/user/userlist | cut -f1 -d: | sort -u | while read user;do
+    one=`cat /root/user/${user}  | grep db | awk '{print $2}'`;
+    echo ${user}":"${one} >> /root/user/tmp.db2user;
+done
+
+allTime=$(date +%s)
+for db in `echo 'show databases' | mysql -s `;do
+    char=""
+    list=""
+    printf "\e[1;32mDB\e[0m: \e[1;33m%s\e[0m  день $day\n" $db
+
+    if [ -f  /var/lib/mysql/$db/db.opt ];then
+	char="--default-character-set `cat /var/lib/mysql/$db/db.opt | grep char | cut -f2 -d=`"
+	printf "выбрана кодировка: \e[1;33m%s\e[0m\n" "`cat /var/lib/mysql/$db/db.opt | grep char | cut -f2 -d=`"
+    fi
+    
+
+    login=`grep $db /root/user/tmp.db2user | cut -f1 -d: |head -n1`
+    if [ $BACKUPUSER == true ];then
+	to=/www/$login/backup/
+    else
+	to=/backup/
+    fi
+    rm -f ${to}${db}_last.sql.gz
+    rm -f ${to}${db}_check.log
+
+    time=$(date +%s)
+    printf "проверка, починка и оптимизация"
+    if [ $BACKUPUSER == true ] && [ "${login}" != "" ];then
+	for param in as cs os;do
+	    nice -n 20 mysqlcheck --auto-repair -${param} ${db} | grep -v 'OK' >> ${to}${db}_check.log
+	done
+    else
+	for param in as cs os;do
+	    nice -n 20 mysqlcheck --auto-repair -${param} ${db} | grep -v 'OK' >> /backup/${db}_check.log
+	done
+    fi
+    printf " - %d сек.\n" $(( $(date +%s) - ${time}))
+
+    time=$(date +%s)
+
+    if [ $BACKUPUSER == true ] && [ "${login}" != "" ];then
+	if [ ! -d "${to}"  ];then
+	    mkdir ${to};
+	    chmod 500 ${to};
+	    chown ${login}:${login} ${to};
+	fi
+#	if [ -f "/www/${login}/backup/.enable.crypt.sql" ];then
+#	    printf "шифрование резервной копии и сохранение в /backup пользователя\n"
+#	    pkey=`cat /root/user/userlist | grep ^${login}: | cut -f3 -d:`
+#	    openssl aes-256-cbc -e -k ${pkey} -a  -in /backup/${db}_${day}.sql.gz -out ${to}${db}_${day}.sql.gz.crypt
+#	    chown ${login}:${login} ${to}${db}_${day}.sql.gz.crypt
+#	fi
+
+	if [ ! -f "${to}.enable.sql" ];then
+	    printf "Пропуск базы - \e[1;33m%s\e[0m, пользователя - \e[1;33m%s\e[0m. Необходимо активировать\n"  "$db" "$login"
+	    continue
+	
+	fi
+
+	printf "Создание резервной копии и сохранение в /backup пользователя - \e[1;33m%s\e[0m" "$login"
+	nice -n 20 mysqldump --extended-insert=0 ${char} ${db} | nice -n 20 gzip -c > ${to}/${db}_${day}.sql.gz
+	chown ${login}:${login} ${to}${db}_${day}.sql.gz
+	chmod 600 ${to}${db}_${day}.sql.gz
+	printf " - %d сек.\n" $(( $(date +%s) - ${time}))
+	getSize "${to}/${db}_${day}.sql.gz" size
+	printf "Размер архива: (\e[1;33m%s\e[0m), путь - \e[1;33m%s\e[0m\n--\n"   ${size}  "${to}/${db}_${day}.sql.gz"
+	ln -sf ${to}/${db}_${day}.sql.gz  ${to}/${db}_last.sql.gz
+	ln -sf ${to}/${db}_${day}.sql.gz  /backup/${db}_${day}.sql.gz
+	ln -sf /backup/${db}_${day}.sql.gz  /backup/${db}_last.sql.gz
+
+    else
+	if [ "$login" != "" ] && [ -f /www/$login/backup/.disable.sql ] ;then
+	    printf "Пропуск базы - \e[1;33m%s\e[0m, пользователя - \e[1;33m%s\e[0m. Заблокировано пользователем\n"  "$db" "$login"
+	    continue
+	fi
+	printf "Создание резервной копии базы не привязанной к пользователю"
+	nice -n 20 mysqldump --extended-insert=0 ${char} ${db} | nice -n 20 gzip -c > /backup/${db}_${day}.sql.gz
+	printf " - %d сек.\n" $(( $(date +%s) - ${time}))
+        getSize "/backup/${db}_${day}.sql.gz" size
+	printf "Размер архива: (\e[1;33m%s\e[0m), путь - \e[1;33m%s\e[0m\n--\n"   ${size}  "/backup/${db}_${day}.sql.gz"
+	ln -sf /backup/${db}_${day}.sql.gz  /backup/${db}_last.sql.gz
+    fi
+    
+done
+
+printf "\e[1;32mЗавершение. Общее время работы: %d сек.\e[0m\n" $(( $(date +%s) - ${allTime}))
+rm -f /root/user/tmp.db2user
+#EOS
+
+

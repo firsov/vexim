@@ -1,0 +1,8 @@
+#!/bin/bash
+
+cat /etc/passwd | grep :/www/ | awk -F:  '{print $1}' | while read user;do
+	if ( (test -f /www/$user/cron/crontab ) && (test ! -f /var/spool/cron/crontabs/$user  || test $(date +%s -r /www/$user/cron/crontab) -gt $( date +%s -r  /var/spool/cron/crontabs/$user)   )) ;then
+        test -f /var/spool/cron/crontabs/$user || touch /var/spool/cron/crontabs/$user
+        cat /www/$user/cron/crontab | crontab -u $user /var/spool/cron/crontabs/$user
+	fi
+done
